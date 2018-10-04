@@ -20,9 +20,11 @@ class MCTS():
         return u
 
     def search(self, board, same_player):
+        # TODO: check this returns the right thing
         # if this is the final position
-        if board.score() != 0:
-            return board.score()[0] * same_player
+        if board.over():
+            score = 1 if board.winner() == 1 else -1
+            return score * same_player
 
         s = str(board)
 
