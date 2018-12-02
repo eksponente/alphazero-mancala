@@ -32,7 +32,7 @@ class Game():
 
     def board(self):
         """Current game board"""
-        if self.turn_player == 1:
+        if self.turn_player() == 1:
             return self._board[:]
         else:
             rot_board = self._board[7:14] + self._board[0:7]
