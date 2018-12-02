@@ -32,7 +32,11 @@ class Game():
 
     def board(self):
         """Current game board"""
-        return self._board[:]
+        if self.turn_player == 1:
+            return self._board[:]
+        else:
+            rot_board = self._board[7:14] + self._board[0:7]
+            return rot_board
 
     def history(self):
         """Array of game boards"""
@@ -42,15 +46,15 @@ class Game():
         """Array of game moves"""
         return self._moves[:]
 
-    def valid_moves(self):
+    def valid_moves(self, return_idxs=False):
         mask = []
-        for m in self._moves[:]:
+        for m in np.arange(6):
             mask.append(int(not self.illegal_move(m)))
         return mask
 
     def turn_player(self):
         """Check number of current player"""
-        return 1 if self._player_one else 2
+        return 1 if self._player_one else -1
 
     def score(self):
         """Returns the current score of the game"""
@@ -60,7 +64,7 @@ class Game():
         """Returns the winner player number, or 0 if the game isn't over"""
         if not self.over():
             return 0
-        return 1 if self.score()[0] > self.score()[1] else 2
+        return 1 if self.score()[0] > self.score()[1] else -1
 
     @staticmethod
     def score_board(board):
@@ -120,8 +124,9 @@ class Game():
     def clone_turn(self, a):
         '''Return a clone of the game object but transformed'''
         current_player = self.turn_player()
+        a = Game.rotate_board(not self._player_one, a)
         self.move(a)
-        same_player = current_player == self.turn_player()
+        same_player = 1 if current_player == self.turn_player() else -1
         if self.turn_player() == 1:
             return self.clone(), same_player
         else:
@@ -142,6 +147,7 @@ class Game():
 
     def illegal_move(self, idx):
         # Illegal move if empty hole
+        idx = Game.rotate_board(not self._player_one, idx)
         if self._board[idx] == 0:
             return True
         # Illegal move if score hole chosen ... not really necessary but keep
@@ -155,10 +161,9 @@ class Game():
             return True
         return False
 
-    # Called to calculate moves
     def move(self, idx):
         """Perform a move action on a given index, based on the current player"""
-
+        idx = Game.rotate_board(not self._player_one, idx)
         if self.over():
             return self.score()
 
