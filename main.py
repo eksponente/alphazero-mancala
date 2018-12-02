@@ -17,8 +17,8 @@ parser.add_argument('--num-channels', type=int, default=512)
 parser.add_argument('--epochs', type=int, default=5)
 parser.add_argument('--batch-size', type=int, default=2048)
 parser.add_argument('--replay-buffer-size', type=int, default=500000)
-parser.add_argument('--mcts-rollouts', type=int, default=300)
-parser.add_argument('--temp-decrese-moves', type=int, default=20)
+parser.add_argument('--mcts-rollouts', type=int, default=50)
+parser.add_argument('--temp-decrese-moves', type=int, default=10)
 parser.add_argument('--n-episodes-per-iteration', type=int, default=1)
 tf.GraphKeys.VARIABLES = tf.GraphKeys.GLOBAL_VARIABLES
 
@@ -91,7 +91,7 @@ def execute_episode(network, replay_buffer, experiment):
 
 def train_network(network, replay_buffer, experiment):
     pis, vs, boards, valid_moves = replay_buffer.sample()
-    loss, _ = network.loss(pis, vs, boards, valid_moves)
+    loss, _ = network.train(pis, vs, boards, valid_moves)
     experiment.log_metric("loss", loss)
     return loss
 

@@ -66,14 +66,9 @@ class NeuralNet(object):
         self.optimizer = tf.train.AdamOptimizer(self.lr)
         self.optimize = self.optimizer.minimize(self.loss)
 
-
-    def loss(self, pis, vs, boards, valid_moves):
+    def train(self, pis, vs, boards, valid_moves):
         # TODO: add L2
-        return self.sess.run([self.loss, self.optimize],
-                             feed_dict={self.target_pis: pis,
-                                        self.target_vs: vs,
-                                        self.input: boards,
-                                        self.valid_moves_tensor: valid_moves})
+        return self.sess.run([self.loss, self.optimize], feed_dict={self.target_pis: pis, self.target_vs: vs, self.input: boards, self.valid_moves_tensor: valid_moves})
 
 
 class ReplayBuffer:
@@ -108,4 +103,4 @@ class ReplayBuffer:
 
     def sample(self):
         idxs = np.random.choice(np.arange(self.pis.shape[0]), self.batch_size)
-        return self.pis[idxs], self.vs[idxs], self.boards[idxs], self.valid_moves[idxs]
+        return self.pis[idxs], self.vs[idxs], np.expand_dims(self.boards[idxs], -1), self.valid_moves[idxs]
