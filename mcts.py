@@ -1,57 +1,85 @@
-import math
+import numpy as np
+import time
 
 
-class MCTS():
-    def __init__(self, board, network, c):
-        self.board = board
+class MCTS:
+    def __init__(self, board, network):
+        # state = root state
+        p, v = network(board, board.valid_moves())
         self.network = network
-        self.Qs = {}
-        self.Ps = {}
-        self.Ns = {}
+        self.root = MCTSNode(board, network)
+        self.board = board
 
-        self.Qsa = {}
-        self.Psa = {}
-        self.Nsa = {}
-        self.n = 0
+    def search(self, node, board=None):
+        if board is not None:
+            self.board = board
+        # check if game is finished
+        if self.board.over():
+            return self.board.winner()
+
+        if node.leaf:
+            p, v = self.network(node, node.valid_moves())
+            node.expand()
+            return v
+
+        a = node.select_move()
+        self.board.move(a)
+        v = self.search(node.children[a])
+        node.update(v)
+        return v
+
+
+class MCTSNode:
+    def __init__(self, board, network, c=4):
+        self.s = str(board)
+        self._board = board
         self.c = c
+        self.actions = np.nonzero(board.valid_moves())[0]
+        self.network = network
+        self.v_mult = board.turn_player()
+        probabilities, _ = network(self._board.board(), self.valid_moves())
+        self.P = {}
+        self.N = {}
+        self.Q = {}
+        self.W = {}
+        for a, p in zip(self.actions, probabilities[0]):
+            self.P[a] = p
+            self.N[a] = 0
+            self.Q[a] = 0
+            self.W[a] = 0
+        self._ucb = {}
+        self._update_ucb()
+        self.children = {}
+        self.leaf = True
 
-    def ucb(self, state, action):
-        u = self.Qsa[state][action] + self.c * self.Psa[state][action] * math.sqrt(sum(self.Nsa[state])) / (1 + self.Nsa[state][action])
-        return u
+    def __str__(self):
+        return self.s
 
-    def search(self, board, same_player):
-        # TODO: check this returns the right thing
-        # if this is the final position
-        if board.over():
-            score = 1 if board.winner() == 1 else -1
-            return score * same_player
+    def _update_ucb(self):
+        ss = sum(self.P.values())
+        for a in self.actions:
+            self._ucb[a] = self.c * self.P[a] * (np.sqrt(ss)) / (1 + self.N[a]) + self.Q[a]
 
-        s = str(board)
+    def expand(self):
+        if self.leaf:
+            for a in self.actions:
+                bb = self._board.clone()
+                bb.move(a)
+                self.children[a] = MCTSNode(bb, self.network)
+        self.leaf = False
 
-        # expansion: the state has never been visited before
-        if s not in self.Psa:
-            pi, v = self.network(board)
-            mask = board.valid_moves()
-            self.Psa[s] = [p * m for p, m in zip(pi, mask)]
-            self.Psa[s] /= sum(self.Psa[s])
-            self.Nsa[s] = [0] * len(mask)
-            self.Qsa[s] = [0] * len(mask)
-            return v * same_player
+    def select_move(self):
+        self.last_move = max(self._ucb, key=self._ucb.get)
+        return self.last_move
 
-        # selection phase
-        # choose the next turn by using the UCB algorithm
-        us = []
-        for a in self.Psa[s]:
-            if board.illegal_move(a):
-                us.append(float("-inf"))
-            else:
-                us.append(self.ucb(s, a))
-        a = us.index(max(us))
+    def update(self, v):
+        self.N[self.last_move] += 1
+        self.W[self.last_move] += v * self.v_mult
+        self.Q[self.last_move] = self.W[self.last_move] / self.N[self.last_move]
+        self._update_ucb()
 
-        next_state, same_player = board.clone_turn(a)
-        v = self.search(next_state, 1 if same_player else -1)
+    def board(self):
+        return self._board.board()
 
-        self.Qsa[s][a] = (self.Nsa[s][a] * self.Qsa[s][a] + v) / (1 + self.Nsa[s][a])
-        self.Nsa[s][a] += 1
-
-        return v * same_player
+    def valid_moves(self):
+        return self._board.valid_moves()

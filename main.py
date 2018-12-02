@@ -1,6 +1,6 @@
 from comet_ml import Experiment
 import argparse
-from mcts2 import MCTS
+from mcts import MCTS
 from network import NeuralNet, ReplayBuffer
 from game import Game
 import os
