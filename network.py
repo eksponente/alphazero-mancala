@@ -42,20 +42,12 @@ class NeuralNet(object):
         print("Saving model {}".format(name))
         self.model.save(name)
 
-    def disp(self):
-        with tf.Session() as sess:
-            print(sess.run(tf.report_uninitialized_variables()))
-
     def _build_model_keras(self):
         self.input_tensor = tf.placeholder(tf.float32, shape=(None, self.board_size, 1))
         self.valid_moves_tensor = tf.placeholder(tf.float32, shape=(None, self.action_size))
         self.input = Input(tensor=self.input_tensor)
         self.valid_moves_mask = Input(tensor=self.valid_moves_tensor)
         x = self.input
-        # x = Conv1D(self.num_channels, 3, padding='same', activation=tf.nn.relu)(x)
-        # x = Conv1D(self.num_channels, 3, padding='same', activation=tf.nn.relu)(x)
-        # x = Conv1D(self.num_channels, 3, padding='same', activation=tf.nn.relu)(x)
-        # x = Conv1D(self.num_channels, 2, padding='same', activation=tf.nn.relu)(x)
         x = Flatten()(x)
 
         x = Dropout(self.dropout)(Dense(2048, activation=tf.nn.relu)(x))
@@ -74,27 +66,6 @@ class NeuralNet(object):
         self.optimizer = tf.train.AdamOptimizer(self.lr)
         self.optimize = self.optimizer.minimize(self.loss)
 
-    def _build_model(self):
-        # self.graph = tf.Graph()
-        # with self.graph.as_default():
-        self.input = tf.placeholder(tf.float32, shape=(None, self.board_size, 1))
-        h1 = tf.nn.relu(tf.layers.batch_normalization(tf.layers.conv1d(self.input, self.num_channels, 3, padding='same')))
-        h2 = tf.nn.relu(tf.layers.batch_normalization(tf.layers.conv1d(h1, self.num_channels, 3, padding='same')))
-        h3 = tf.nn.relu(tf.layers.batch_normalization(tf.layers.conv1d(h2, self.num_channels, 3, padding='same')))
-        h4 = tf.nn.relu(tf.layers.batch_normalization(tf.layers.conv1d(h3, self.num_channels, 2, padding='same')))
-        h5 = tf.reshape(h4, [-1, int(h4.get_shape()[1]) * int(h4.get_shape()[2])])
-        h6 = tf.layers.dropout(tf.nn.relu(tf.layers.batch_normalization(tf.contrib.layers.fully_connected(h5, 1024))), self.dropout)
-        h7 = tf.layers.dropout(tf.nn.relu(tf.layers.batch_normalization(tf.contrib.layers.fully_connected(h6, 512))), self.dropout)
-        self.pi = tf.contrib.layers.fully_connected(h7, self.action_size)
-        self.prob = tf.nn.softmax(self.pi)
-        self.v = tf.tanh(tf.contrib.layers.fully_connected(h7, 1))
-        self.target_pis = tf.placeholder(tf.float32, shape=[None, self.action_size])
-        self.target_vs = tf.placeholder(tf.float32, shape=None)
-        self.loss_pi = tf.losses.softmax_cross_entropy(self.target_pis, self.pi)
-        self.loss_v = tf.losses.mean_squared_error(self.target_vs, tf.reshape(self.v, shape=[-1, ]))
-        self.loss = self.loss_pi + self.loss_v
-        self.optimizer = tf.train.AdamOptimizer(self.lr)
-        self.optimize = self.optimizer.minimize(self.loss)
 
     def loss(self, pis, vs, boards, valid_moves):
         # TODO: add L2
