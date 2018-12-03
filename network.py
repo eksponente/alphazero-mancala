@@ -69,8 +69,6 @@ class NeuralNet(object):
 
         self.target_pis = tf.placeholder(tf.float32, shape=[None, self.action_size])
         self.target_vs = tf.placeholder(tf.float32, shape=None)
-        # self.loss_pi = -tf.reduce_mean(tf.matmul(tf.transpose(self.target_pis), tf.log(self.prob + 10e-7)))
-        # self.loss_pi = tf.losses.softmax_cross_entropy(self.target_pis, self.prob)
         self.loss_v = tf.losses.mean_squared_error(self.target_vs, tf.reshape(self.v, shape=[-1, ]))
         self.loss_pi = tf.reduce_mean(tf.keras.backend.categorical_crossentropy(self.target_pis, self.prob, from_logits=True))
         self.loss = self.loss_pi + self.loss_v
@@ -108,6 +106,7 @@ class ReplayBuffer:
         self.episode += 1
 
     def finish_episode(self, result):
+        # walk through the last episode and fill in the target values (which corresponds to the winner of the game)
         while self.episode > 0:
             self.vs[-self.episode] *= result
             self.episode -= 1
