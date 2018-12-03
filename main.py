@@ -26,13 +26,15 @@ tf.GraphKeys.VARIABLES = tf.GraphKeys.GLOBAL_VARIABLES
 
 def train_alphazero(lr, dropout, num_channels, epochs, batch_size, replay_buffer_size,
                     temp_decrese_moves, mcts_rollouts, n_episodes_per_iteration, eval):
-    # Add the following code anywhere in your machine learning file
     board = Game(player_turn=1)
     network = NeuralNet(board, num_channels, lr, dropout, epochs,
                         batch_size)
+    # if evaluating, just run the evaluator
     if eval:
         network.load()
         evaluate_network(network, board)
+        
+    # set up the experiment
     experiment = Experiment(api_key=os.environ.get('ALPHAZERO_API_KEY'),
                             project_name=os.environ.get('ALPHAZERO_PROJECT_NAME'),
                             workspace=os.environ.get('ALPHAZERO_WORKSPACE'))
@@ -48,11 +50,7 @@ def train_alphazero(lr, dropout, num_channels, epochs, batch_size, replay_buffer
         'n_episodes_per_iteration': n_episodes_per_iteration
     })
     buf = ReplayBuffer(replay_buffer_size, batch_size)
-    with tf.Session() as sess:
-            sess.run(tf.global_variables_initializer())
-            all_variables_list = ops.get_collection(ops.GraphKeys.GLOBAL_VARIABLES)
-            init_all_op = tf.variables_initializer(var_list=all_variables_list)
-            sess.run(init_all_op)
+
     epoch = 0
     while True:
         epoch += 1
@@ -79,16 +77,14 @@ def execute_episode(network, replay_buffer, experiment):
         # perform mcts search
         for i in range(experiment.get_parameter('mcts_rollouts')):
             mcts.search(mcts.root, board.clone())
+
         # choose the action
         N_total = np.sum(np.array(list(mcts.root.N.values())) ** (1 / temp))
         pi = np.zeros(6)
         for a in mcts.root.actions:
             pi[a] = mcts.root.N[a] ** (1 / temp) / N_total
         action = np.random.choice(np.arange(6), p=pi)
-        print("loop")
-        print(pi)
-        print(network(board, board.valid_moves())[0][0])
-        print(board.valid_moves())
+        # add the move to the replay buffer
         replay_buffer.add(board.board(), action, pi, mcts.root.v_mult, board.valid_moves())
         board.move(action)
         if board.over():
