@@ -4,7 +4,6 @@ import numpy as np
 class MCTS:
     def __init__(self, board, network):
         # state = root state
-        p, v = network(board, board.valid_moves())
         self.network = network
         self.root = MCTSNode(board, network)
         self.board = board
@@ -15,7 +14,6 @@ class MCTS:
         # check if game is finished
         if self.board.over():
             return self.board.winner()
-
         if node.leaf:
             p, v = self.network(node, node.valid_moves())
             node.expand()
@@ -31,7 +29,7 @@ class MCTS:
 class MCTSNode:
     def __init__(self, board, network, c=4):
         self.s = str(board)
-        self._board = board
+        self._board = board.clone()
         self.c = c
         self.actions = np.nonzero(board.valid_moves())[0]
         self.network = network

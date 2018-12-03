@@ -46,7 +46,7 @@ class Game():
         """Array of game moves"""
         return self._moves[:]
 
-    def valid_moves(self, return_idxs=False):
+    def valid_moves(self):
         mask = []
         for m in np.arange(6):
             mask.append(int(not self.illegal_move(m)))
@@ -114,12 +114,15 @@ class Game():
 
     def clone(self):
         """Return a clone of the game object"""
-        return Game(
-            self.board(),
-            self.turn_player(),
-            self.moves(),
-            self.history()
-        )
+        if self.turn_player() == 1:
+            return Game(
+                self.board()
+            )
+        else:
+            return Game(
+                self.board()[7:14] + self.board()[0:7],
+                self.turn_player()
+            )
 
     def clone_turn(self, a):
         '''Return a clone of the game object but transformed'''
@@ -148,6 +151,8 @@ class Game():
     def illegal_move(self, idx):
         # Illegal move if empty hole
         idx = Game.rotate_board(not self._player_one, idx)
+        if idx >= 14:
+            return True
         if self._board[idx] == 0:
             return True
         # Illegal move if score hole chosen ... not really necessary but keep
@@ -163,6 +168,9 @@ class Game():
 
     def move(self, idx):
         """Perform a move action on a given index, based on the current player"""
+        if self.illegal_move(idx):
+            import pdb; pdb.set_trace()
+            raise ValueError("Illegal move chosen: {}.".format(idx))
         idx = Game.rotate_board(not self._player_one, idx)
         if self.over():
             return self.score()

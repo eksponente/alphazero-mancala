@@ -3,6 +3,7 @@ import numpy as np
 from keras.models import Model
 from keras.layers import Dense, Input, Flatten, Dropout, Multiply, Softmax
 from keras import backend as K
+from keras import regularizers
 
 
 class NeuralNet(object):
@@ -30,12 +31,16 @@ class NeuralNet(object):
             hh = np.array([hh])
             hh = np.expand_dims(hh, -1)
         valid_moves = np.array([valid_moves])
-        return self.sess.run([self.prob, self.v], feed_dict={self.input: hh,
-                                                             self.valid_moves_tensor: valid_moves})
+
+        inp = {self.input: hh, self.valid_moves_tensor: valid_moves}
+        return self.sess.run([self.prob, self.v], feed_dict=inp)
 
     def init(self):
         self.sess.run(tf.global_variables_initializer())
         self.sess.run(tf.local_variables_initializer())
+
+    def load(self, name='model1.h5'):
+        self.model.load_weights(name)
 
     def save(self):
         name = 'model.h5'
@@ -50,25 +55,31 @@ class NeuralNet(object):
         x = self.input
         x = Flatten()(x)
 
-        x = Dropout(self.dropout)(Dense(2048, activation=tf.nn.relu)(x))
-        x = Dropout(self.dropout)(Dense(1024, activation=tf.nn.relu)(x))
-        x = Dropout(self.dropout)(Dense(512, activation=tf.nn.relu)(x))
-        self.pi = Dense(self.action_size)(x)
-        self.prob = Softmax()(Multiply()([self.pi, self.valid_moves_mask]))
+        x = Dropout(self.dropout)(Dense(2048, activation=tf.nn.relu,
+                                        kernel_regularizer=regularizers.l2(10e-4))(x))
+        x = Dropout(self.dropout)(Dense(1024, activation=tf.nn.relu,
+                                        kernel_regularizer=regularizers.l2(10e-4))(x))
+        x = Dropout(self.dropout)(Dense(512, activation=tf.nn.relu,
+                                        kernel_regularizer=regularizers.l2(10e-4))(x))
+        self.pi = Dense(self.action_size, kernel_regularizer=regularizers.l2(10e-4), activation=tf.nn.sigmoid)(x)
+        self.pi_masked = Multiply()([self.pi, self.valid_moves_mask])
+        self.prob = self.pi_masked * (1 / K.sum(self.pi_masked))
         self.v = Dense(1)(x)
-        self.model = Model(inputs=[self.input, self.valid_moves_mask], outputs=[self.prob, self.v])
+        self.model = Model(inputs=[self.input, self.valid_moves_mask], outputs=[self.pi_masked, self.v])
 
         self.target_pis = tf.placeholder(tf.float32, shape=[None, self.action_size])
         self.target_vs = tf.placeholder(tf.float32, shape=None)
-        self.loss_pi = tf.losses.softmax_cross_entropy(self.target_pis, self.prob)
+        # self.loss_pi = -tf.reduce_mean(tf.matmul(tf.transpose(self.target_pis), tf.log(self.prob + 10e-7)))
+        # self.loss_pi = tf.losses.softmax_cross_entropy(self.target_pis, self.prob)
         self.loss_v = tf.losses.mean_squared_error(self.target_vs, tf.reshape(self.v, shape=[-1, ]))
+        self.loss_pi = tf.reduce_mean(tf.keras.backend.categorical_crossentropy(self.target_pis, self.prob, from_logits=True))
         self.loss = self.loss_pi + self.loss_v
         self.optimizer = tf.train.AdamOptimizer(self.lr)
         self.optimize = self.optimizer.minimize(self.loss)
+        self.entropy = tf.reduce_mean(tf.distributions.Categorical(probs=self.pi).entropy())
 
     def train(self, pis, vs, boards, valid_moves):
-        # TODO: add L2
-        return self.sess.run([self.loss, self.optimize], feed_dict={self.target_pis: pis, self.target_vs: vs, self.input: boards, self.valid_moves_tensor: valid_moves})
+        return self.sess.run([self.loss, self.optimize, self.entropy], feed_dict={self.target_pis: pis, self.target_vs: vs, self.input: boards, self.valid_moves_tensor: valid_moves})
 
 
 class ReplayBuffer:
