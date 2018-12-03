@@ -15,3 +15,4 @@ https://www.comet.ml/eksponente/alphazero
 - [ ] Add documentation
 - [ ] Add tensorboard support
 - [ ] Add proper logging
+- [ ] Describe results
