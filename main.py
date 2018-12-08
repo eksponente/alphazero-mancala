@@ -18,7 +18,7 @@ parser.add_argument('--epochs', type=int, default=5)
 parser.add_argument('--batch-size', type=int, default=2048)
 parser.add_argument('--replay-buffer-size', type=int, default=500000)
 parser.add_argument('--mcts-rollouts', type=int, default=150)
-parser.add_argument('--temp-decrese-moves', type=int, default=1)
+parser.add_argument('--temp-decrese-moves', type=int, default=5)
 parser.add_argument('--n-episodes-per-iteration', type=int, default=3)
 parser.add_argument('--eval', action='store_true')
 tf.GraphKeys.VARIABLES = tf.GraphKeys.GLOBAL_VARIABLES
@@ -54,8 +54,7 @@ def train_alphazero(lr, dropout, num_channels, epochs, batch_size, replay_buffer
             winner = execute_episode(network, buf, experiment)
             print("Finished episode {}, winner {}, time {}".format(i, winner, time.clock()))
         network.clone()
-        for _ in range(epochs):
-            loss, entropy = train_network(network, buf, experiment)
+        loss, entropy = train_network(network, buf, experiment)
 
         print("Training loss: {}, entropy: {}".format(loss, entropy))
         won_counter = evaluate_network(network, board, 10)
@@ -98,11 +97,10 @@ def execute_episode(network, replay_buffer, experiment):
 
 def train_network(network, replay_buffer, experiment):
     pis, vs, boards, valid_moves = replay_buffer.sample()
-    loss, _, entropy, loss_pi, loss_v = network.train(pis, vs, boards, valid_moves)
+    loss = network.train(pis, vs, boards, valid_moves)
+    entropy = network.compute_entropy(boards, valid_moves)
     experiment.log_metric("loss", loss)
     experiment.log_metric("entropy", entropy)
-    experiment.log_metric("loss_pi", loss_pi)
-    experiment.log_metric("loss_v", loss_v)
     return loss, entropy
 
 

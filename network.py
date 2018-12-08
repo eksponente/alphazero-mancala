@@ -4,6 +4,7 @@ from keras.models import Model, clone_model
 from keras.layers import Dense, Input, Flatten, Dropout, Multiply, Softmax, Conv2D, Reshape
 from keras import backend as K
 from keras import regularizers
+from keras.optimizers import Adam
 
 
 class NeuralNet(object):
@@ -30,11 +31,11 @@ class NeuralNet(object):
         if len(hh.shape) < 3:
             hh = np.reshape(hh, (-1, 7, 2, 1))
         valid_moves = np.array([valid_moves])
+
         if old:
             return self.old_model.predict([hh, valid_moves])
         else:
-            inp = {self.input: hh, self.valid_moves_tensor: valid_moves}
-            return self.sess.run([self.prob, self.v], feed_dict=inp)
+            return self.model.predict([hh, valid_moves])
 
     def init(self):
         self.sess.run(tf.global_variables_initializer())
@@ -51,10 +52,9 @@ class NeuralNet(object):
     def _build_model_keras(self):
         self.input_tensor = tf.placeholder(tf.float32, shape=(None, self.board_size / 2, 2, 1))
         self.valid_moves_tensor = tf.placeholder(tf.float32, shape=(None, self.action_size))
-        self.input = Input(tensor=self.input_tensor)
-        self.valid_moves_mask = Input(tensor=self.valid_moves_tensor)
+        self.input = Input((int(self.board_size / 2), 2, 1))
+        self.valid_moves_mask = Input((self.action_size,))
         x = self.input
-        # x = Reshape((7, 2, 1))(x)
         x = Conv2D(self.num_channels, 2, padding='same', activation=tf.nn.relu,
                    kernel_regularizer=regularizers.l2(10e-4))(x)
         x = Conv2D(self.num_channels, 2, padding='same', activation=tf.nn.relu,
@@ -72,11 +72,11 @@ class NeuralNet(object):
         self.prob = self.pi_masked * (1 / K.sum(self.pi_masked))
         self.v = Dense(1)(x)
         self.model = Model(inputs=[self.input, self.valid_moves_mask], outputs=[self.pi_masked, self.v])
+        self.model.compile(loss=['categorical_crossentropy', 'mean_squared_error'], optimizer=Adam(self.lr))
 
         self.target_pis = tf.placeholder(tf.float32, shape=[None, self.action_size])
         self.target_vs = tf.placeholder(tf.float32, shape=None)
         self.loss_v = tf.losses.mean_squared_error(self.target_vs, tf.reshape(self.v, shape=[-1, ]))
-        # self.loss_pi = tf.reduce_mean(tf.multiply(tf.transpose(self.target_pis), tf.log(self.prob + 10e-7)))
 
         self.loss_pi = tf.reduce_mean(tf.reduce_sum(tf.multiply(self.target_pis, tf.log(self.prob + 10e-7)), 1, keepdims=True))
 
@@ -85,9 +85,14 @@ class NeuralNet(object):
         self.optimize = self.optimizer.minimize(self.loss)
         self.entropy = tf.reduce_mean(tf.distributions.Categorical(probs=self.pi).entropy())
 
+    def compute_entropy(self, boards, valid_moves):
+        hh = np.reshape(boards, (-1, 7, 2, 1))
+        return self.sess.run(self.entropy, feed_dict={self.input: hh, self.valid_moves_mask: valid_moves})
+
     def train(self, pis, vs, boards, valid_moves):
         hh = np.reshape(boards, (-1, 7, 2, 1))
-        return self.sess.run([self.loss, self.optimize, self.entropy, self.loss_pi, self.loss_v], feed_dict={self.target_pis: pis, self.target_vs: vs, self.input: hh, self.valid_moves_tensor: valid_moves})
+        res = self.model.fit([hh, valid_moves], [pis, vs], self.batch_size, self.epochs, verbose=1)
+        return res.history['loss'][-1]
 
     def clone(self):
         inp = Input((int(self.board_size / 2), 2, 1))
