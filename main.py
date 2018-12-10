@@ -21,14 +21,27 @@ parser.add_argument('--mcts-rollouts', type=int, default=150)
 parser.add_argument('--temp-decrese-moves', type=int, default=5)
 parser.add_argument('--n-episodes-per-iteration', type=int, default=3)
 parser.add_argument('--eval', action='store_true')
+parser.add_argument('--model', type=str, default=None)
+parser.add_argument('--test', action='store_true')
 tf.GraphKeys.VARIABLES = tf.GraphKeys.GLOBAL_VARIABLES
 
 
 def train_alphazero(lr, dropout, num_channels, epochs, batch_size, replay_buffer_size,
-                    temp_decrese_moves, mcts_rollouts, n_episodes_per_iteration, eval):
+                    temp_decrese_moves, mcts_rollouts, n_episodes_per_iteration, eval, model, test):
     board = Game(player_turn=1)
     network = NeuralNet(board, num_channels, lr, dropout, epochs,
                         batch_size)
+    if model is not None:
+        print("Loading {}".format(model))
+        network.load(model)
+    if test:
+        while True:
+            while board.turn_player() == -1:
+                move = np.argmax(network(board, board.valid_moves())[0][0])
+                print("Board {}, move {}".format(board.board(), move))
+                board.move(move)
+            print("{}".format(board.board()))
+            import pdb; pdb.set_trace()
     # set up the experiment
     experiment = Experiment(api_key=os.environ.get('ALPHAZERO_API_KEY'),
                             project_name=os.environ.get('ALPHAZERO_PROJECT_NAME'),
@@ -88,6 +101,7 @@ def execute_episode(network, replay_buffer, experiment):
         action = np.random.choice(np.arange(6), p=pi)
         # add the move to the replay buffer
         replay_buffer.add(board.board(), action, pi, mcts.root.v_mult, board.valid_moves())
+        print("Board {}, action {}, MCTS probabilities {}".format(board.board(), action, pi))
         board.move(action)
         if board.over():
             replay_buffer.finish_episode(board.winner())
@@ -127,4 +141,4 @@ def evaluate_network(network, board, n_episodes):
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    train_alphazero(args.learning_rate, args.dropout, args.num_channels, args.epochs, args.batch_size, args.replay_buffer_size, args.temp_decrese_moves, args.mcts_rollouts, args.n_episodes_per_iteration, args.eval)
+    train_alphazero(args.learning_rate, args.dropout, args.num_channels, args.epochs, args.batch_size, args.replay_buffer_size, args.temp_decrese_moves, args.mcts_rollouts, args.n_episodes_per_iteration, args.eval, args.model, args.test)
